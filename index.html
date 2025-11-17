@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>p5 + 3D Force Graph (hover image)</title>
+
+  <link rel="stylesheet" type="text/css" href="style.css">
+
+  <script src="libraries/p5.min.js"></script>
+  <script src="libraries/p5.sound.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+    }
+  </style>
+
+  <script src="//cdn.jsdelivr.net/npm/3d-force-graph"></script>
+  <!--<script src="../../dist/3d-force-graph.js"></script>-->
+</head>
+
+
+<body>
+  <script src="sketch.js"></script>
+  <div id="3d-graph"></div>
+
+  <script type="module">
+    import * as THREE from 'https://esm.sh/three';
+
+    const imgs = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg', 'img5.jpg', 'img6.jpg', 'img7.jpg', 'img8.jpg', 'img9.jpg', 'img10.jpg', 'img11.jpg', 'img12.jpg'];
+
+    const N = 100;
+    const gData = {
+      nodes: [...Array(N).keys()].map(i => ({
+        id: i,
+        img: imgs[Math.floor(Math.random() * imgs.length)] // 隨機分配圖片
+      })),
+      links: [...Array(N).keys()]
+        .filter(id => id)
+        .map(id => ({
+          source: id,
+          target: Math.round(Math.random() * (id - 1))
+        }))
+    };
+
+    let hoveredNode = null;
+
+    const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
+      .linkWidth(0.2)
+      .linkColor(() => '#ffffff')
+      .linkOpacity(0.6)
+      .nodeThreeObject(node => {
+        const texture = new THREE.TextureLoader().load(`imgs/${node.img}`, tex => {
+          const aspect = tex.image.width / tex.image.height;
+          const baseHeight = 12;
+          const baseWidth = baseHeight * aspect;
+          node.__sprite.scale.set(baseWidth, baseHeight, 1);
+          node.__baseScale = { w: baseWidth, h: baseHeight };
+        });
+
+        const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(mat);
+        node.__sprite = sprite;
+        return sprite;
+      })
+
+      .onNodeHover(node => {
+        // 恢復前一個節點原本比例
+        if (hoveredNode && hoveredNode.__sprite && hoveredNode.__baseScale) {
+          hoveredNode.__sprite.scale.set(
+            hoveredNode.__baseScale.w,
+            hoveredNode.__baseScale.h,
+            1
+          );
+        }
+
+        // 放大當前節點（維持比例）
+        if (node && node.__sprite && node.__baseScale) {
+          const scaleFactor = 8; // 放大倍率，可調整
+          node.__sprite.scale.set(
+            node.__baseScale.w * scaleFactor,
+            node.__baseScale.h * scaleFactor,
+            1
+          );
+        }
+
+        hoveredNode = node || null;
+        document.body.style.cursor = node ? 'pointer' : '';
+      })
+
+      .graphData(gData);
+
+
+  </script>
+</body>
+
+
+</html>
