@@ -27,72 +27,66 @@
   <div id="3d-graph"></div>
 
   <script type="module">
-    import * as THREE from 'https://esm.sh/three';
+  import * as THREE from 'https://esm.sh/three';
 
-    const imgs = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg', 'img5.jpg', 'img6.jpg', 'img7.jpg', 'img8.jpg', 'img9.jpg', 'img10.jpg', 'img11.jpg', 'img12.jpg'];
+  // 1. start 3D Force Graph
+  const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
+    .linkWidth(0.2)
+    .linkColor(() => '#ffffff')
+    .linkOpacity(0.6)
+    .nodeThreeObject(node => {
+      // if node.img is not a full URL, prepend the S3 bucket URL
+      const loader = new THREE.TextureLoader();
+      // set crossOrigin to anonymous to avoid CORS issues
+      loader.setCrossOrigin('anonymous');
 
-    const N = 100;
-    const gData = {
-      nodes: [...Array(N).keys()].map(i => ({
-        id: i,
-        img: imgs[Math.floor(Math.random() * imgs.length)] // 隨機分配圖片
-      })),
-      links: [...Array(N).keys()]
-        .filter(id => id)
-        .map(id => ({
-          source: id,
-          target: Math.round(Math.random() * (id - 1))
-        }))
-    };
+      const texture = loader.load(node.img, tex => { // node.img is expected to be a URL string
+        const aspect = tex.image.width / tex.image.height;
+        const baseHeight = 12;
+        const baseWidth = baseHeight * aspect;
+        node.__sprite.scale.set(baseWidth, baseHeight, 1);
+        node.__baseScale = { w: baseWidth, h: baseHeight };
+      });
 
-    let hoveredNode = null;
+      const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      node.__sprite = sprite;
+      return sprite;
+    })
+    .onNodeHover(node => {
+      // ... (original hover logic remains unchanged) ...
+      if (hoveredNode && hoveredNode.__sprite && hoveredNode.__baseScale) {
+        hoveredNode.__sprite.scale.set(hoveredNode.__baseScale.w, hoveredNode.__baseScale.h, 1);
+      }
+      if (node && node.__sprite && node.__baseScale) {
+        const scaleFactor = 8;
+        node.__sprite.scale.set(node.__baseScale.w * scaleFactor, node.__baseScale.h * scaleFactor, 1);
+      }
+      hoveredNode = node || null;
+      document.body.style.cursor = node ? 'pointer' : '';
+    });
 
-    const Graph = new ForceGraph3D(document.getElementById('3d-graph'))
-      .linkWidth(0.2)
-      .linkColor(() => '#ffffff')
-      .linkOpacity(0.6)
-      .nodeThreeObject(node => {
-        const texture = new THREE.TextureLoader().load(`imgs/${node.img}`, tex => {
-          const aspect = tex.image.width / tex.image.height;
-          const baseHeight = 12;
-          const baseWidth = baseHeight * aspect;
-          node.__sprite.scale.set(baseWidth, baseHeight, 1);
-          node.__baseScale = { w: baseWidth, h: baseHeight };
-        });
+  // 2. get data from backend API
+  async function fetchGraphData() {
+    try {
+      // assume the backend API endpoint is 'https://your-api-endpoint.com/api/graph-data'
+      const response = await fetch('https://your-api-endpoint.com/api/graph-data');
+      const data = await response.json();
 
-        const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const sprite = new THREE.Sprite(mat);
-        node.__sprite = sprite;
-        return sprite;
-      })
+      // 3. update Graph data
+      Graph.graphData(data);
 
-      .onNodeHover(node => {
-        // 恢復前一個節點原本比例
-        if (hoveredNode && hoveredNode.__sprite && hoveredNode.__baseScale) {
-          hoveredNode.__sprite.scale.set(
-            hoveredNode.__baseScale.w,
-            hoveredNode.__baseScale.h,
-            1
-          );
-        }
+    } catch (error) {
+      console.error("無法獲取數據:", error);
+    }
+  }
 
-        // 放大當前節點（維持比例）
-        if (node && node.__sprite && node.__baseScale) {
-          const scaleFactor = 8; // 放大倍率，可調整
-          node.__sprite.scale.set(
-            node.__baseScale.w * scaleFactor,
-            node.__baseScale.h * scaleFactor,
-            1
-          );
-        }
+  // 4. execute data fetching
+  fetchGraphData();
 
-        hoveredNode = node || null;
-        document.body.style.cursor = node ? 'pointer' : '';
-      })
-
-      .graphData(gData);
-
-
+  // 5. (optional) If you want "Real-time" updates as the poster suggests, you can set up periodic refresh
+  // Fetch new data from the backend every 5 seconds
+  setInterval(fetchGraphData, 5000);
   </script>
 </body>
 
